@@ -71,20 +71,11 @@ class MainWindow(QMainWindow):
         # File menu
         file_menu = menubar.addMenu('File')
 
-        # Download action
-        download_action = QAction('Download Videos', self)
-        download_action.triggered.connect(self.show_download_dialog)
-        file_menu.addAction(download_action)
-
         # Settings action
         settings_action = QAction('Settings', self)
         settings_action.triggered.connect(self.show_settings)
         file_menu.addAction(settings_action)
 
-        # Exit action
-        exit_action = QAction('Exit', self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
 
     def show_settings(self):
         dialog = SettingsDialog(self)
