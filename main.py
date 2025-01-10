@@ -101,7 +101,8 @@ class MainWindow(QMainWindow):
         channel = self.channels_model.data(self.channels_list.currentIndex(), 0)
         if not channel:
             return
-
+        if "@" in channel:
+            channel = channel.replace("@", "")
         api_key = self.settings.value('api_key', '')
         output_dir = self.settings.value('base_dir', '')
         max_threads = int(self.settings.value('max_threads', '4'))

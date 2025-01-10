@@ -18,6 +18,7 @@ class DownloadDialog(QDialog):
         self.stop_button = self.findChild(QPushButton, 'pushButtonStop')
         self.close_button = self.findChild(QPushButton, 'pushButtonClose')
         self.create_video_list_button = self.findChild(QPushButton, 'pushButtonVideoList')
+        self.refresh_video_list_button = self.findChild(QPushButton, 'pushButtonRefreshVideoList')
 
         # Setup model
         self.list_model = QStandardItemModel()
@@ -27,7 +28,8 @@ class DownloadDialog(QDialog):
         self.start_button.clicked.connect(self.start_download)
         self.stop_button.clicked.connect(self.stop_download)
         self.close_button.clicked.connect(self.close)
-        self.create_video_list_button.clicked.connect(self.refresh_video_list)
+        self.create_video_list_button.clicked.connect(lambda: self.refresh_video_list(False))
+        self.refresh_video_list_button.clicked.connect(lambda: self.refresh_video_list(True))
 
         # Initialize variables
         self.downloader = None
@@ -87,7 +89,7 @@ class DownloadDialog(QDialog):
         self.start_button.setEnabled(False)
         self.list_model.clear()
         self.metadata_text.clear()
-        self.log_progress("Fetching video list...")
+        self.log_progress(f"Fetching video list...")
 
         def update_list():
             try:

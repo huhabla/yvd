@@ -72,7 +72,30 @@
      <item>
       <widget class="QPushButton" name="pushButtonVideoList">
        <property name="text">
-        <string>List Videos</string>
+        <string>Show Videos List</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_3">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Preferred</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButtonRefreshVideoList">
+       <property name="text">
+        <string>Refresh Video List</string>
        </property>
       </widget>
      </item>
