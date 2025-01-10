@@ -143,24 +143,30 @@
             <item row="0" column="1">
              <widget class="QLineEdit" name="lineEditApiKey">
               <property name="enabled">
-               <bool>false</bool>
+               <bool>true</bool>
               </property>
               <property name="font">
                <font>
                 <pointsize>8</pointsize>
                </font>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
               </property>
              </widget>
             </item>
             <item row="1" column="1">
              <widget class="QLineEdit" name="lineEditOutputDir">
               <property name="enabled">
-               <bool>false</bool>
+               <bool>true</bool>
               </property>
               <property name="font">
                <font>
                 <pointsize>8</pointsize>
                </font>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
               </property>
              </widget>
             </item>
@@ -264,9 +270,26 @@
             </spacer>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButtonSettings">
+            <widget class="QPushButton" name="pushButtonBack">
+             <property name="font">
+              <font>
+               <pointsize>8</pointsize>
+              </font>
+             </property>
              <property name="text">
-              <string>Settings</string>
+              <string>back</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButtonForward">
+             <property name="font">
+              <font>
+               <pointsize>8</pointsize>
+              </font>
+             </property>
+             <property name="text">
+              <string>forward</string>
              </property>
             </widget>
            </item>
@@ -289,26 +312,32 @@
             </spacer>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButtonBack">
-             <property name="font">
-              <font>
-               <pointsize>8</pointsize>
-              </font>
-             </property>
+            <widget class="QPushButton" name="pushButtonSettings">
              <property name="text">
-              <string>back</string>
+              <string>Settings</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButtonForward">
-             <property name="font">
-              <font>
-               <pointsize>8</pointsize>
-              </font>
+            <spacer name="horizontalSpacer_4">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
              </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Fixed</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>10</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="pushButton">
              <property name="text">
-              <string>forward</string>
+              <string>Close</string>
              </property>
             </widget>
            </item>
@@ -341,5 +370,22 @@
   </customwidget>
  </customwidgets>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1222</x>
+     <y>964</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1076</x>
+     <y>983</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

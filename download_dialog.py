@@ -1,6 +1,14 @@
 from PyQt5.QtWidgets import QDialog, QListView, QTextEdit, QPushButton
+from PyQt5.QtCore import Qt, QStringListModel, QSettings, QUrl
+from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
+from PyQt5 import uic
+from channel_downloader import ChannelDownloader
+from threading import Thread
+
+from PyQt5.QtWidgets import QDialog, QListView, QTextEdit, QPushButton
 from PyQt5.QtCore import Qt, QStringListModel, QSettings
 from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5 import uic
 from channel_downloader import ChannelDownloader
 from threading import Thread
@@ -19,6 +27,8 @@ class DownloadDialog(QDialog):
         self.close_button = self.findChild(QPushButton, 'pushButtonClose')
         self.create_video_list_button = self.findChild(QPushButton, 'pushButtonVideoList')
         self.refresh_video_list_button = self.findChild(QPushButton, 'pushButtonRefreshVideoList')
+        self.single_download_button = self.findChild(QPushButton, 'pushButtonSingleDownload')
+        self.web_view = self.findChild(QWebEngineView, 'webEngineView')
 
         # Setup model
         self.list_model = QStandardItemModel()
@@ -30,6 +40,10 @@ class DownloadDialog(QDialog):
         self.close_button.clicked.connect(self.close)
         self.create_video_list_button.clicked.connect(lambda: self.refresh_video_list(False))
         self.refresh_video_list_button.clicked.connect(lambda: self.refresh_video_list(True))
+        self.single_download_button.clicked.connect(self.download_selected_video)
+
+        # Connect video selection to web view update
+        self.video_list.selectionModel().selectionChanged.connect(self.on_video_selected)
 
         # Initialize variables
         self.downloader = None
@@ -39,10 +53,50 @@ class DownloadDialog(QDialog):
         # Initial button states
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(False)
+        self.single_download_button.setEnabled(False)
 
         # Add selection change handler
-        self.video_list.selectionModel().selectionChanged.connect(self.on_video_selected)
+        self.video_list.selectionModel().selectionChanged.connect(self.on_selection_changed)
         self.metadata_text = self.findChild(QTextEdit, 'textEditMetadata')
+
+    def on_selection_changed(self, selected, deselected):
+        """Enable/disable single download button based on selection"""
+        self.single_download_button.setEnabled(len(selected.indexes()) > 0)
+        self.on_video_selected(selected, deselected)
+
+    def download_selected_video(self):
+        """Download currently selected video"""
+        indexes = self.video_list.selectedIndexes()
+        if not indexes:
+            return
+
+        url = self.list_model.data(indexes[0], Qt.DisplayRole)
+
+        # Disable buttons during download
+        self.single_download_button.setEnabled(False)
+        self.start_button.setEnabled(False)
+
+        def download_single():
+            try:
+                success = self.downloader.download_video(url)
+
+                # Update list view item color
+                for row in range(self.list_model.rowCount()):
+                    item = self.list_model.item(row)
+                    if item.text() == url:
+                        item.setBackground(QColor(200, 255, 200) if success else QColor(255, 200, 200))
+                        break
+
+                self.log_progress(f"Single video download {'completed' if success else 'failed'}: {url}")
+            except Exception as e:
+                self.log_progress(f"Error downloading video: {str(e)}")
+            finally:
+                # Re-enable buttons
+                self.single_download_button.setEnabled(True)
+                self.start_button.setEnabled(True)
+
+        # Start download in background thread
+        Thread(target=download_single, daemon=True).start()
 
     def setup(self, api_key: str, channel: str, output_dir: str, max_threads: int):
         self.api_key = api_key
@@ -73,6 +127,12 @@ class DownloadDialog(QDialog):
             return
 
         url = self.list_model.data(indexes[0], Qt.DisplayRole)
+
+        # Update web view
+        if self.web_view:
+            self.web_view.setUrl(QUrl(url))
+
+        # Update metadata
         try:
             metadata = self.downloader.get_video_metadata(url)
             self.metadata_text.setText(metadata.model_dump_json(indent=4))
