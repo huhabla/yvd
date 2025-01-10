@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.download_button = self.findChild(QPushButton, 'pushButtonDownload')
         self.forward_button = self.findChild(QPushButton, 'pushButtonForward')
         self.back_button = self.findChild(QPushButton, 'pushButtonBack')
+        self.settings_button = self.findChild(QPushButton, 'pushButtonSettings')
 
         # Set up the channels model
         channel_file = self.settings.value('channel_file', 'channels.txt')
@@ -64,6 +65,7 @@ class MainWindow(QMainWindow):
         self.back_button.clicked.connect(self.web_view.back)
         self.forward_button.clicked.connect(self.web_view.forward)
         self.download_button.clicked.connect(self.show_download_dialog)
+        self.settings_button.clicked.connect(self.show_settings)
 
     def create_menu_bar(self):
         menubar = self.menuBar()
