@@ -1,17 +1,29 @@
+import os
 from PyQt5.QtWidgets import QDialog, QListView, QTextEdit, QPushButton
 from PyQt5.QtCore import Qt, QStringListModel, QSettings, QUrl
-from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
-from PyQt5 import uic
-from channel_downloader import ChannelDownloader
-from threading import Thread
-
-from PyQt5.QtWidgets import QDialog, QListView, QTextEdit, QPushButton
-from PyQt5.QtCore import Qt, QStringListModel, QSettings
 from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5 import uic
 from channel_downloader import ChannelDownloader
 from threading import Thread
+from datetime import datetime
+
+
+class VideoListItem(QStandardItem):
+    def __init__(self, url: str, metadata=None):
+        # Create display text
+        if metadata:
+            # Format date and truncate title
+            date_str = metadata.date.strftime('%Y-%m-%d') if metadata.date else "No date"
+            title = metadata.title[:50] + "..." if len(metadata.title) > 50 else metadata.title
+            display_text = f"{date_str} - {title}"
+        else:
+            display_text = url
+
+        super().__init__(display_text)
+
+        # Store URL as item data
+        self.setData(url, Qt.UserRole)
 
 
 class DownloadDialog(QDialog):
@@ -29,6 +41,7 @@ class DownloadDialog(QDialog):
         self.refresh_video_list_button = self.findChild(QPushButton, 'pushButtonRefreshVideoList')
         self.single_download_button = self.findChild(QPushButton, 'pushButtonSingleDownload')
         self.web_view = self.findChild(QWebEngineView, 'webEngineView')
+        self.metadata_text = self.findChild(QTextEdit, 'textEditMetadata')
 
         # Setup model
         self.list_model = QStandardItemModel()
@@ -41,9 +54,7 @@ class DownloadDialog(QDialog):
         self.create_video_list_button.clicked.connect(lambda: self.refresh_video_list(False))
         self.refresh_video_list_button.clicked.connect(lambda: self.refresh_video_list(True))
         self.single_download_button.clicked.connect(self.download_selected_video)
-
-        # Connect video selection to web view update
-        self.video_list.selectionModel().selectionChanged.connect(self.on_video_selected)
+        self.video_list.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
         # Initialize variables
         self.downloader = None
@@ -54,49 +65,6 @@ class DownloadDialog(QDialog):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(False)
         self.single_download_button.setEnabled(False)
-
-        # Add selection change handler
-        self.video_list.selectionModel().selectionChanged.connect(self.on_selection_changed)
-        self.metadata_text = self.findChild(QTextEdit, 'textEditMetadata')
-
-    def on_selection_changed(self, selected, deselected):
-        """Enable/disable single download button based on selection"""
-        self.single_download_button.setEnabled(len(selected.indexes()) > 0)
-        self.on_video_selected(selected, deselected)
-
-    def download_selected_video(self):
-        """Download currently selected video"""
-        indexes = self.video_list.selectedIndexes()
-        if not indexes:
-            return
-
-        url = self.list_model.data(indexes[0], Qt.DisplayRole)
-
-        # Disable buttons during download
-        self.single_download_button.setEnabled(False)
-        self.start_button.setEnabled(False)
-
-        def download_single():
-            try:
-                success = self.downloader.download_video(url)
-
-                # Update list view item color
-                for row in range(self.list_model.rowCount()):
-                    item = self.list_model.item(row)
-                    if item.text() == url:
-                        item.setBackground(QColor(200, 255, 200) if success else QColor(255, 200, 200))
-                        break
-
-                self.log_progress(f"Single video download {'completed' if success else 'failed'}: {url}")
-            except Exception as e:
-                self.log_progress(f"Error downloading video: {str(e)}")
-            finally:
-                # Re-enable buttons
-                self.single_download_button.setEnabled(True)
-                self.start_button.setEnabled(True)
-
-        # Start download in background thread
-        Thread(target=download_single, daemon=True).start()
 
     def setup(self, api_key: str, channel: str, output_dir: str, max_threads: int):
         self.api_key = api_key
@@ -117,28 +85,26 @@ class DownloadDialog(QDialog):
         self.create_video_list_button.setEnabled(True)
         self.start_button.setEnabled(False)
 
-    def log_progress(self, message: str):
-        self.output_text.append(message)
+    def on_selection_changed(self, selected, deselected):
+        """Enable/disable single download button based on selection"""
+        self.single_download_button.setEnabled(len(selected.indexes()) > 0)
 
-    def on_video_selected(self, selected, deselected):
-        """Handle video selection change"""
+        # Update web view and metadata
         indexes = selected.indexes()
-        if not indexes:
-            return
+        if indexes:
+            url = self.list_model.data(indexes[0], Qt.UserRole)
 
-        url = self.list_model.data(indexes[0], Qt.DisplayRole)
+            # Update web view
+            if self.web_view:
+                self.web_view.setUrl(QUrl(url))
 
-        # Update web view
-        if self.web_view:
-            self.web_view.setUrl(QUrl(url))
-
-        # Update metadata
-        try:
-            metadata = self.downloader.get_video_metadata(url)
-            self.metadata_text.setText(metadata.model_dump_json(indent=4))
-        except Exception as e:
-            self.log_progress(f"Error loading metadata: {str(e)}")
-            self.metadata_text.setText("Error loading metadata")
+            # Update metadata
+            try:
+                metadata = self.downloader.get_video_metadata(url)
+                self.metadata_text.setText(metadata.model_dump_json(indent=4))
+            except Exception as e:
+                self.log_progress(f"Error loading metadata: {str(e)}")
+                self.metadata_text.setText("Error loading metadata")
 
     def refresh_video_list(self, force_refresh: bool = True):
         """Refresh video list in background thread"""
@@ -158,14 +124,39 @@ class DownloadDialog(QDialog):
 
                 self.list_model.clear()
                 for url in urls:
-                    item = QStandardItem(url)
+                    # For regular list loading, just check if metadata exists
+                    metadata_exists = os.path.exists(
+                        self.downloader.get_metadata_path(self.downloader.get_video_id(url)))
+
+                    if force_refresh and not metadata_exists:
+                        # Only load metadata if refresh button was clicked and metadata doesn't exist
+                        try:
+                            metadata = self.downloader.get_video_metadata(url, force_refresh=False)
+                            item = VideoListItem(url, metadata)
+                        except Exception as e:
+                            self.log_progress(f"Error loading metadata for {url}: {str(e)}")
+                            item = VideoListItem(url)
+                    else:
+                        # For initial list loading or if metadata exists
+                        if metadata_exists:
+                            try:
+                                metadata = self.downloader.get_video_metadata(url, force_refresh=False)
+                                item = VideoListItem(url, metadata)
+                            except:
+                                item = VideoListItem(url)
+                        else:
+                            item = VideoListItem(url)
+
                     if self.downloader.is_video_downloaded(url):
                         item.setBackground(QColor(200, 255, 200))  # Light green
                     else:
                         item.setBackground(QColor(255, 200, 200))  # Light red
+
                     self.list_model.appendRow(item)
 
                 self.log_progress(f"Found {len(urls)} videos")
+                if force_refresh:
+                    self.log_progress("Metadata refresh completed")
                 self.create_video_list_button.setEnabled(True)
                 self.start_button.setEnabled(True)
 
@@ -175,6 +166,41 @@ class DownloadDialog(QDialog):
 
         self.video_list_thread = Thread(target=update_list, daemon=True)
         self.video_list_thread.start()
+
+    def download_selected_video(self):
+        """Download currently selected video"""
+        indexes = self.video_list.selectedIndexes()
+        if not indexes:
+            return
+
+        # Get URL from item data
+        url = self.list_model.data(indexes[0], Qt.UserRole)
+
+        # Disable buttons during download
+        self.single_download_button.setEnabled(False)
+        self.start_button.setEnabled(False)
+
+        def download_single():
+            try:
+                success = self.downloader.download_video(url)
+
+                # Update list view item color
+                for row in range(self.list_model.rowCount()):
+                    item = self.list_model.item(row)
+                    if item.data(Qt.UserRole) == url:
+                        item.setBackground(QColor(200, 255, 200) if success else QColor(255, 200, 200))
+                        break
+
+                self.log_progress(f"Single video download {'completed' if success else 'failed'}: {url}")
+            except Exception as e:
+                self.log_progress(f"Error downloading video: {str(e)}")
+            finally:
+                # Re-enable buttons
+                self.single_download_button.setEnabled(True)
+                self.start_button.setEnabled(True)
+
+        # Start download in background thread
+        Thread(target=download_single, daemon=True).start()
 
     def start_download(self):
         if self.download_thread and self.download_thread.is_alive():
@@ -209,7 +235,7 @@ class DownloadDialog(QDialog):
                 # Update list view item color
                 for row in range(self.list_model.rowCount()):
                     item = self.list_model.item(row)
-                    if item.text() == url:
+                    if item.data(Qt.UserRole) == url:
                         item.setBackground(QColor(200, 255, 200) if success else QColor(255, 200, 200))
                         break
 
@@ -225,3 +251,6 @@ class DownloadDialog(QDialog):
             self.downloader.stop()
             self.stop_button.setEnabled(False)
             self.log_progress("Download stopped by user")
+
+    def log_progress(self, message: str):
+        self.output_text.append(message)
