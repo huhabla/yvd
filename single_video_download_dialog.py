@@ -7,11 +7,10 @@ import os
 
 # Add this new dialog class in main.py
 class SingleVideoDownloadDialog(QDialog):
-    def __init__(self, url: str, output_dir: str, api_key: str, parent=None):
+    def __init__(self, url: str, output_dir: str, parent=None):
         super().__init__(parent)
         self.url = url
         self.output_dir = output_dir
-        self.api_key = api_key
         self.setup_ui()
 
     def setup_ui(self):
@@ -35,7 +34,6 @@ class SingleVideoDownloadDialog(QDialog):
         try:
             # Create downloader instance
             downloader = ChannelDownloader(
-                api_key=self.api_key,
                 output_dir=os.path.dirname(save_path),
                 progress_callback=self.log_progress,
                 settings=QSettings('YVD', 'YoutubeVideoDownloader')

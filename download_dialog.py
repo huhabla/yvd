@@ -73,15 +73,13 @@ class DownloadDialog(QDialog):
         self.stop_button.setEnabled(False)
         self.single_download_button.setEnabled(False)
 
-    def setup(self, api_key: str, channel: str, output_dir: str, max_threads: int):
-        self.api_key = api_key
+    def setup(self, channel: str, output_dir: str, max_threads: int):
         self.channel = channel
         self.output_dir = output_dir
         self.max_threads = max_threads
 
         # Create downloader with settings
         self.downloader = ChannelDownloader(
-            api_key=api_key,
             output_dir=output_dir,
             max_threads=max_threads,
             progress_callback=self.log_progress,

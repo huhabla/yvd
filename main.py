@@ -44,7 +44,6 @@ class MainWindow(QMainWindow):
         # Store references to all important widgets
         self.channels_list = self.findChild(QListView, 'listView')
         self.reload_button = self.findChild(QPushButton, 'pushButtonReload')
-        self.api_key_input = self.findChild(QLineEdit, 'lineEditApiKey')
         self.output_dir_input = self.findChild(QLineEdit, 'lineEditOutputDir')
         self.browse_button = self.findChild(QToolButton, 'toolButton')
         self.web_view = self.findChild(QWebEngineView, 'webEngineView')
@@ -60,7 +59,6 @@ class MainWindow(QMainWindow):
         self.channels_list.setModel(self.channels_model)
 
         # Load saved settings
-        self.api_key_input.setText(self.settings.value('api_key', ''))
         self.output_dir_input.setText(self.settings.value('base_dir', ''))
 
         # Connect signals
@@ -90,7 +88,6 @@ class MainWindow(QMainWindow):
                 try:
                     # Get video metadata to get title
                     downloader = ChannelDownloader(
-                        api_key=self.settings.value('api_key', ''),
                         output_dir=self.settings.value('base_dir', ''),
                         progress_callback=lambda x: None
                     )
@@ -114,7 +111,6 @@ class MainWindow(QMainWindow):
                         dialog = SingleVideoDownloadDialog(
                             url=current_url,
                             output_dir=os.path.dirname(save_path),
-                            api_key=self.settings.value('api_key', ''),
                             parent=self
                         )
                         dialog.show()
@@ -155,8 +151,6 @@ class MainWindow(QMainWindow):
             # Reload channels with new settings
             channel_file = self.settings.value('channel_file', 'channels.txt')
             self.channels_model.load_channels(channel_file)
-            # Update API key input
-            self.api_key_input.setText(self.settings.value('api_key', ''))
             # Update output directory input
             self.output_dir_input.setText(self.settings.value('base_dir', ''))
 
@@ -166,12 +160,11 @@ class MainWindow(QMainWindow):
             return
         if "@" in channel:
             channel = channel.replace("@", "")
-        api_key = self.settings.value('api_key', '')
         output_dir = self.settings.value('base_dir', '')
         max_threads = int(self.settings.value('max_threads', '4'))
 
         dialog = DownloadDialog(self)
-        dialog.setup(api_key, channel, output_dir, max_threads)
+        dialog.setup(channel, output_dir, max_threads)
         dialog.exec_()
 
     def on_channel_selected(self, index):

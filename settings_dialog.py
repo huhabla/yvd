@@ -28,10 +28,6 @@ class SettingsDialog(QDialog):
         channel_layout.addWidget(self.channel_browse)
         form.addRow("Channels File:", channel_layout)
 
-        # API Key
-        self.api_key = QLineEdit()
-        form.addRow("YouTube API Key:", self.api_key)
-
         # Base directory
         self.base_dir = QLineEdit()
         self.dir_browse = QPushButton("Browse")
@@ -85,8 +81,6 @@ class SettingsDialog(QDialog):
     def load_settings(self):
         self.channel_file.setText(
             self.settings.value('channel_file', 'channels.txt'))
-        self.api_key.setText(
-            self.settings.value('api_key', ''))
         self.base_dir.setText(
             self.settings.value('base_dir', os.path.expanduser('~')))
         self.max_threads.setValue(
@@ -99,7 +93,6 @@ class SettingsDialog(QDialog):
 
     def save_settings(self):
         self.settings.setValue('channel_file', self.channel_file.text())
-        self.settings.setValue('api_key', self.api_key.text())
         self.settings.setValue('base_dir', self.base_dir.text())
         self.settings.setValue('max_threads', self.max_threads.value())
         self.settings.setValue('preferred_resolution', self.resolution_combo.currentText())
