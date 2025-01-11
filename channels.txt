@@ -1,2 +1,2 @@
-joerogan
-veritasium
+@joerogan
+@veritasium
