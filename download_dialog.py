@@ -15,8 +15,14 @@ class VideoListItem(QStandardItem):
         if metadata:
             # Format date and truncate title
             date_str = metadata.date.strftime('%Y-%m-%d') if metadata.date else "No date"
+
+            # Format video length
+            length_mins = metadata.length // 60
+            length_secs = metadata.length % 60
+            length_str = f"{length_mins}:{str(length_secs).zfill(2)} min"
+
             title = metadata.title[:50] + "..." if len(metadata.title) > 50 else metadata.title
-            display_text = f"{date_str} - {title}"
+            display_text = f"{date_str} - {length_str} - {title}"
         else:
             display_text = url
 
@@ -84,6 +90,7 @@ class DownloadDialog(QDialog):
         # Don't automatically refresh - wait for user action
         self.create_video_list_button.setEnabled(True)
         self.start_button.setEnabled(False)
+        self.refresh_video_list(False)
 
     def on_selection_changed(self, selected, deselected):
         """Enable/disable single download button based on selection"""
@@ -101,10 +108,78 @@ class DownloadDialog(QDialog):
             # Update metadata
             try:
                 metadata = self.downloader.get_video_metadata(url)
-                self.metadata_text.setText(metadata.model_dump_json(indent=4))
+
+                # Load HTML template
+                template_path = os.path.join(os.path.dirname(__file__), 'metadata_template.html')
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    html_template = f.read()
+
+                # Format video length
+                length_mins = metadata.length // 60
+                length_secs = metadata.length % 60
+                length_str = f"{length_mins}:{str(length_secs).zfill(2)} minutes"
+
+                # Format keywords
+                keywords_html = ''.join(
+                    [f'<span class="keywords">{k}</span>' for k in metadata.keywords]) if metadata.keywords else 'None'
+
+                # Format date
+                date_str = metadata.date.strftime('%Y-%m-%d %H:%M:%S') if metadata.date else 'Unknown'
+
+                # Replace placeholders in template
+                html_content = html_template.format(
+                    title=metadata.title,
+                    author=metadata.author,
+                    date=date_str,
+                    length=length_str,
+                    channel_url=metadata.channel_url,
+                    url=metadata.url,
+                    description=metadata.description or 'No description available',
+                    keywords=keywords_html
+                )
+
+                # Set HTML content
+                self.metadata_text.setHtml(html_content)
+
             except Exception as e:
+                import traceback
+                error_traceback = traceback.format_exc()
                 self.log_progress(f"Error loading metadata: {str(e)}")
-                self.metadata_text.setText("Error loading metadata")
+                error_html = f"""
+                        <html>
+                            <head>
+                                <style>
+                                    body {{
+                                        color: red;
+                                        font-family: Arial, sans-serif;
+                                        margin: 20px;
+                                    }}
+                                    .error-title {{
+                                        font-size: 18px;
+                                        font-weight: bold;
+                                        margin-bottom: 10px;
+                                    }}
+                                    .error-message {{
+                                        margin-bottom: 15px;
+                                    }}
+                                    .traceback {{
+                                        font-family: monospace;
+                                        white-space: pre-wrap;
+                                        background-color: #ffeeee;
+                                        padding: 10px;
+                                        border: 1px solid #ffcccc;
+                                        border-radius: 4px;
+                                    }}
+                                </style>
+                            </head>
+                            <body>
+                                <div class="error-title">Error loading metadata</div>
+                                <div class="error-message">{str(e)}</div>
+                                <div class="traceback">{error_traceback}</div>
+                            </body>
+                        </html>
+                    """
+                self.metadata_text.setHtml(error_html)
 
     def refresh_video_list(self, force_refresh: bool = True):
         """Refresh video list in background thread"""
