@@ -1,14 +1,18 @@
 import sys
+import os
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QListView, QPushButton,
     QTextEdit, QLineEdit, QToolButton, QLabel,
-    QMenuBar, QMenu, QAction, QDialog
+    QMenuBar, QMenu, QAction, QDialog, QFileDialog
 )
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import QStringListModel, QUrl, QSettings
+from PyQt5.QtCore import QStringListModel, QUrl, QSettings, Qt
+
+from channel_downloader import ChannelDownloader
 from settings_dialog import SettingsDialog
 from download_dialog import DownloadDialog
+from single_video_download_dialog import SingleVideoDownloadDialog
 
 
 class ChannelsModel(QStringListModel):
@@ -68,6 +72,72 @@ class MainWindow(QMainWindow):
         self.download_button.clicked.connect(self.show_download_dialog)
         self.settings_button.clicked.connect(self.show_settings)
 
+        self.web_view.urlChanged.connect(self.on_url_changed)
+        # Make URL label clickable
+        self.url_label.mouseDoubleClickEvent = self.on_url_label_double_click
+
+    def on_url_changed(self, url):
+        """Update URL label when web view URL changes"""
+        self.url_label.setText(url.toString())
+
+    def on_url_label_double_click(self, event):
+        """Handle double click on URL label"""
+        if event.button() == Qt.LeftButton:
+            current_url = self.web_view.url().toString()
+
+            # Check if this is a YouTube video URL
+            if 'youtube.com/watch' in current_url:
+                try:
+                    # Get video metadata to get title
+                    downloader = ChannelDownloader(
+                        api_key=self.settings.value('api_key', ''),
+                        output_dir=self.settings.value('base_dir', ''),
+                        progress_callback=lambda x: None
+                    )
+
+                    metadata = downloader.get_video_metadata(current_url)
+
+                    # Clean title for filename
+                    clean_title = "".join(c for c in metadata.title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                    default_filename = f"{clean_title}.mp4"
+
+                    # Get save location from user
+                    save_path, _ = QFileDialog.getSaveFileName(
+                        self,
+                        "Save Video As",
+                        os.path.join(self.settings.value('base_dir', ''), default_filename),
+                        "Video Files (*.mp4)"
+                    )
+
+                    if save_path:
+                        # Create and show download dialog
+                        dialog = SingleVideoDownloadDialog(
+                            url=current_url,
+                            output_dir=os.path.dirname(save_path),
+                            api_key=self.settings.value('api_key', ''),
+                            parent=self
+                        )
+                        dialog.show()
+
+                        # Start download in a separate thread
+                        from threading import Thread
+                        Thread(
+                            target=dialog.download_video,
+                            args=(save_path,),
+                            daemon=True
+                        ).start()
+
+                        # Show dialog
+                        dialog.exec_()
+
+                except Exception as e:
+                    import traceback
+                    QtWidgets.QMessageBox.critical(
+                        self,
+                        "Error",
+                        f"Failed to start download: {str(e)}\n{traceback.format_exc()}"
+                    )
+
     def create_menu_bar(self):
         menubar = self.menuBar()
 
@@ -78,7 +148,6 @@ class MainWindow(QMainWindow):
         settings_action = QAction('Settings', self)
         settings_action.triggered.connect(self.show_settings)
         file_menu.addAction(settings_action)
-
 
     def show_settings(self):
         dialog = SettingsDialog(self)

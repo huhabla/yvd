@@ -48,7 +48,8 @@ class SettingsDialog(QDialog):
 
         # Add resolution selector
         self.resolution_combo = QComboBox()
-        self.resolution_combo.addItems(['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p'])
+        # self.resolution_combo.addItems(['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p'])
+        self.resolution_combo.addItems(['360p'])
         form.addRow("Preferred Resolution:", self.resolution_combo)
 
         layout.addLayout(form)

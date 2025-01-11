@@ -182,7 +182,38 @@ class ChannelDownloader:
         self.save_video_metadata(yt, video_id)
         return self.get_video_metadata(url)
 
-    def download_video(self, url: str) -> bool:
+    # Add these methods to the ChannelDownloader class in channel_downloader.py
+
+    def get_temp_video_path(self, video_id: str) -> str:
+        """Get temporary video file path during download"""
+        return os.path.join(self.current_channel_dir or self.output_dir, f"{video_id}.downloading.mp4")
+
+    def rename_video_files(self, video_id: str, new_path: str):
+        """Rename video and metadata files to new location"""
+        # Get current file paths
+        current_video_path = self.get_video_path(video_id)
+        current_meta_path = self.get_metadata_path(video_id)
+
+        # Get new metadata path based on new video path
+        new_meta_path = os.path.splitext(new_path)[0] + '.json'
+
+        try:
+            # Rename video file if it exists
+            if os.path.exists(current_video_path):
+                os.rename(current_video_path, new_path)
+
+            # Rename metadata file if it exists
+            if os.path.exists(current_meta_path):
+                os.rename(current_meta_path, new_meta_path)
+
+            return True
+        except Exception as e:
+            import traceback
+            self.progress_callback(f"Error renaming files: {str(e)}\n{traceback.format_exc()}")
+            return False
+
+    def download_video(self, url: str, target_path: str = None) -> bool:
+        """Download video with optional target path for renaming"""
         if self._stop_requested:
             return False
 
@@ -197,15 +228,8 @@ class ChannelDownloader:
             original_dir = os.getcwd()
             os.chdir(output_dir)
 
-            final_filename = f"{video_id}.mp4"
             temp_filename = f"{video_id}.downloading.mp4"
-
-            # Check if final file exists
-            if os.path.exists(final_filename):
-                logger.info(f"Video already exists: {video_id}")
-                self.progress_callback(f"Video already exists: {video_id}")
-                os.chdir(original_dir)  # Restore original directory
-                return True
+            final_filename = f"{video_id}.mp4"
 
             try:
                 # Remove any incomplete downloads if they exist
@@ -217,17 +241,18 @@ class ChannelDownloader:
                 # Get stream based on resolution setting
                 resolution = self.settings.value('preferred_resolution', '1080p')
                 stream = self.get_stream_by_resolution(yt, resolution)
+                self.progress_callback(f"DEBUG: Selected stream resolution: {stream.resolution if stream else 'None'}")
+                self.progress_callback(f"DEBUG: Available streams: {[s.resolution for s in yt.streams.filter(progressive=True, file_extension='mp4')]}")
+
                 if not stream:
-                    logger.warning(
+                    self.progress_callback(
                         f"Requested resolution {resolution} not available, falling back to highest resolution")
                     stream = yt.streams.get_highest_resolution()
 
                 # Save metadata first
                 self.save_video_metadata(yt, video_id)
 
-                logger.info(f"Downloading: {yt.title} ({stream.resolution})")
-                self.progress_callback(
-                    f"Downloading: {yt.title} ({stream.resolution}) to: {os.path.join(output_dir, temp_filename)}")
+                self.progress_callback(f"Downloading: {yt.title} ({stream.resolution})")
 
                 # Download using temporary filename
                 stream.download(filename=temp_filename)
@@ -236,11 +261,17 @@ class ChannelDownloader:
                 if os.path.exists(temp_filename) and os.path.getsize(temp_filename) > 0:
                     # Rename temporary file to final filename
                     os.replace(temp_filename, final_filename)
-                    logger.info(f"Completed: {yt.title}")
                     self.progress_callback(f"Completed: {yt.title}")
+
+                    # If target path is specified, rename files
+                    if target_path:
+                        if self.rename_video_files(video_id, target_path):
+                            self.progress_callback(f"Files renamed to: {target_path}")
+                        else:
+                            self.progress_callback("Failed to rename files")
+
                     return True
                 else:
-                    logger.error(f"Download failed - file empty or missing: {yt.title}")
                     self.progress_callback(f"Download failed - file empty or missing: {yt.title}")
                     return False
 
@@ -251,9 +282,7 @@ class ChannelDownloader:
                         os.remove(temp_filename)
                 except Exception as e:
                     import traceback
-                    error_traceback = traceback.format_exc()
-                    message = f"Error cleaning up temporary file:: {str(e)} {error_traceback}"
-                    logger.error(message)
+                    self.progress_callback(f"Error cleaning up temporary file: {str(e)}\n{traceback.format_exc()}")
 
                 # Always restore the original directory
                 os.chdir(original_dir)
@@ -261,35 +290,50 @@ class ChannelDownloader:
         except Exception as e:
             import traceback
             error_traceback = traceback.format_exc()
-            message = f"Error downloading {url}: {str(e)} {error_traceback}"
-            logger.error(message)
-            self.progress_callback(message)
+            self.progress_callback(f"Error downloading {url}: {str(e)}\n{error_traceback}")
             return False
 
     def get_stream_by_resolution(self, yt: YouTube, preferred_resolution: str) -> Optional[Stream]:
         """Get best stream matching preferred resolution"""
-        # Get all progressive streams (with video and audio)
-        streams = yt.streams.filter(progressive=True, file_extension='mp4')
+        # Get all progressive streams (with video and audio) sorted by resolution
+        streams = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc()
 
-        # Try to find exact match
+        if not streams:
+            self.progress_callback("No suitable streams found")
+            return None
+
+        # Convert preferred resolution to integer for comparison
+        target_res = int(preferred_resolution.replace('p', ''))
+
+        # Log available resolutions for debugging
+        available_resolutions = [s.resolution for s in streams]
+        self.progress_callback(f"Available resolutions: {available_resolutions}")
+
+        # First try exact match
+        exact_match = streams.filter(resolution=preferred_resolution).first()
+        if exact_match:
+            self.progress_callback(f"Found exact resolution match: {exact_match.resolution}")
+            return exact_match
+
+        # If no exact match, get the highest resolution that's less than or equal to preferred
         for stream in streams:
-            if stream.resolution == preferred_resolution:
+            if not stream.resolution:
+                continue
+
+            current_res = int(stream.resolution.replace('p', ''))
+            if current_res <= target_res:
+                self.progress_callback(f"Selected closest resolution: {stream.resolution}")
                 return stream
 
-        # If no exact match, get closest lower resolution
-        available_resolutions = sorted([
-            int(s.resolution.replace('p', ''))
-            for s in streams
-            if s.resolution
-        ], reverse=True)
+        # If no suitable resolution found, return highest available
+        highest = streams.first()
+        if highest:
+            self.progress_callback(f"Falling back to highest available resolution: {highest.resolution}")
+            return highest
 
-        target_res = int(preferred_resolution.replace('p', ''))
-        for res in available_resolutions:
-            if res <= target_res:
-                return next(s for s in streams if s.resolution == f'{res}p')
-
-        # Fallback to the lowest available
-        return streams.order_by('resolution').desc().last()
+        # Last resort - return any available stream
+        self.progress_callback("No preferred resolution available, using first available stream")
+        return streams.first()
 
     def stop(self):
         logger.info("Stopping download process...")

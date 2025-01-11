@@ -3,3 +3,4 @@ googleapi
 pydantic
 pytubefix
 PyQtWebEngine
+ffmpeg-python
