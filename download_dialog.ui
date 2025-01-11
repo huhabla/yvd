@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1583</width>
-    <height>804</height>
+    <width>1823</width>
+    <height>998</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -21,7 +21,7 @@
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <widget class="QWidget" name="">
+       <widget class="QWidget" name="layoutWidget">
         <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
           <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -39,7 +39,11 @@
             </widget>
            </item>
            <item>
-            <widget class="QListView" name="listView"/>
+            <widget class="QListView" name="listView">
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
