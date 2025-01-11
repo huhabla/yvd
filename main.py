@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
 
         # Connect signals
         self.channels_list.clicked.connect(self.on_channel_selected)
+        self.channels_list.doubleClicked.connect(self.show_download_dialog)
         self.reload_button.clicked.connect(self.reload_channels)
         self.back_button.clicked.connect(self.web_view.back)
         self.forward_button.clicked.connect(self.web_view.forward)
