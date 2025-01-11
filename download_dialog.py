@@ -30,6 +30,7 @@ class VideoListItem(QStandardItem):
 
         # Store URL as item data
         self.setData(url, Qt.UserRole)
+        self.setEditable(False)
 
 
 class DownloadDialog(QDialog):
@@ -194,8 +195,7 @@ class DownloadDialog(QDialog):
 
         def update_list():
             try:
-                channel_id = self.downloader.get_channel_id(self.channel)
-                urls = self.downloader.get_video_urls(channel_id, self.channel, force_refresh)
+                urls = self.downloader.get_video_urls(self.channel, force_refresh)
 
                 self.list_model.clear()
                 for url in urls:
@@ -236,7 +236,9 @@ class DownloadDialog(QDialog):
                 self.start_button.setEnabled(True)
 
             except Exception as e:
-                self.log_progress(f"Error getting video list: {str(e)}")
+                import traceback
+                error_traceback = traceback.format_exc()
+                self.log_progress(f"Error getting video list:  {str(e)} {error_traceback}")
                 self.create_video_list_button.setEnabled(True)
 
         self.video_list_thread = Thread(target=update_list, daemon=True)
@@ -268,7 +270,9 @@ class DownloadDialog(QDialog):
 
                 self.log_progress(f"Single video download {'completed' if success else 'failed'}: {url}")
             except Exception as e:
-                self.log_progress(f"Error downloading video: {str(e)}")
+                import traceback
+                error_traceback = traceback.format_exc()
+                self.log_progress(f"Error downloading video: {str(e)}  {error_traceback}")
             finally:
                 # Re-enable buttons
                 self.single_download_button.setEnabled(True)
@@ -298,8 +302,7 @@ class DownloadDialog(QDialog):
 
     def download_videos(self):
         try:
-            channel_id = self.downloader.get_channel_id(self.channel)
-            video_urls = self.downloader.get_video_urls(channel_id, self.channel, force_refresh=False)
+            video_urls = self.downloader.get_video_urls(self.channel, force_refresh=False)
 
             for url in video_urls:
                 if self.downloader._stop_requested:

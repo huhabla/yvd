@@ -82,10 +82,11 @@ class ChannelDownloader:
             channel_id = data["items"][0]["id"]
             logger.info(f"Found channel ID: {channel_id}")
             return channel_id
-        raise ValueError("Channel not found")
+        raise ValueError(f"Channel not found: {data}")
 
-    def get_video_urls(self, channel_id: str, channel_name: str, force_refresh: bool = False) -> List[str]:
+    def get_video_urls(self, channel_name: str, force_refresh: bool = False) -> List[str]:
         """Get video URLs from cache or YouTube API"""
+
         self.current_channel_dir = self.get_channel_dir(channel_name)
         video_list_file = self.get_video_list_file(channel_name)
 
@@ -96,6 +97,8 @@ class ChannelDownloader:
                 data = json.load(f)
                 return data['urls']
 
+        channel_id = self.get_channel_id(channel_name)
+        logger.info(f"{channel_name} -> {channel_id}")
         logger.info("Fetching video list from YouTube API...")
         self.progress_callback("Fetching video list from YouTube API...")
         youtube = build("youtube", "v3", developerKey=self.api_key)
@@ -247,14 +250,20 @@ class ChannelDownloader:
                     if os.path.exists(temp_filename):
                         os.remove(temp_filename)
                 except Exception as e:
-                    logger.error(f"Error cleaning up temporary file: {str(e)}")
+                    import traceback
+                    error_traceback = traceback.format_exc()
+                    message = f"Error cleaning up temporary file:: {str(e)} {error_traceback}"
+                    logger.error(message)
 
                 # Always restore the original directory
                 os.chdir(original_dir)
 
         except Exception as e:
-            logger.error(f"Error downloading {url}: {str(e)}")
-            self.progress_callback(f"Error downloading {url}: {str(e)}")
+            import traceback
+            error_traceback = traceback.format_exc()
+            message = f"Error downloading {url}: {str(e)} {error_traceback}"
+            logger.error(message)
+            self.progress_callback(message)
             return False
 
     def get_stream_by_resolution(self, yt: YouTube, preferred_resolution: str) -> Optional[Stream]:
@@ -290,9 +299,8 @@ class ChannelDownloader:
         self._stop_requested = False
         logger.info(f"Starting download for channel: {channel_name}")
 
-        channel_id = self.get_channel_id(channel_name)
         self.current_channel_dir = self.get_channel_dir(channel_name)
-        video_urls = self.get_video_urls(channel_id, channel_name)
+        video_urls = self.get_video_urls(channel_name)
 
         if not os.path.exists(self.current_channel_dir):
             os.makedirs(self.current_channel_dir)
